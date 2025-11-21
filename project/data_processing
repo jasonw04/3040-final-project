@@ -1,6 +1,6 @@
 """
 ITEC 3040 Final Project — Sections 3, 4, 5, 6
-KNN removed due to extremely high computational cost.
+
 """
 
 # ============================
