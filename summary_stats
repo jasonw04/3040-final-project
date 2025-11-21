@@ -1,0 +1,106 @@
+import kagglehub
+import bz2
+import pandas as pd
+import numpy as np
+import re
+import matplotlib.pyplot as plt
+import seaborn as sns
+import scipy.stats as stats
+
+# --- Download dataset ---
+path = kagglehub.dataset_download("bittlingmayer/amazonreviews")
+print("Path to dataset files:", path)
+
+# --- Load the full dataset ---
+with bz2.open(path + "/test.ft.txt.bz2", "rt", encoding="utf-8") as f:
+    lines = [line.strip() for line in f]
+
+# --- Create DataFrame and extract labels/reviews ---
+df = pd.DataFrame(lines, columns=["raw"])
+df["__label__"] = df["raw"].str.extract(r"(__label__\d)")
+df["review_text"] = df["raw"].str.replace(r"__label__\d\s", "", regex=True)
+
+# --- Compute review length (word count) ---
+df["review_length"] = df["review_text"].apply(lambda x: len(re.findall(r"\b\w+\b", x)))
+s = df["review_length"]
+
+print(df.head())
+print(df.shape)
+
+# --- Compute statistics manually for control ---
+mean = s.mean()
+median = s.median()
+mode = s.mode()[0]
+std_dev = s.std()
+_min = s.min()
+_max = s.max()
+q25 = np.percentile(s, 25)
+q50 = np.percentile(s, 50)
+q75 = np.percentile(s, 75)
+
+# --- Print formatted summary ---
+print("\nSummary Statistics – Review Length")
+print(f"  Mean = {mean:.4f}")
+print(f"  Median = {median:.4f}")
+print(f"  Mode = {mode:.4f}")
+print(f"  Standard Deviation = {std_dev:.4f}")
+print(f"  Minimum = {_min:.4f}")
+print(f"  25th Percentile = {q25:.4f}")
+print(f"  50th Percentile = {q50:.4f}")
+print(f"  75th Percentile = {q75:.4f}")
+print(f"  Maximum = {_max:.4f}")
+
+
+path = kagglehub.dataset_download("bittlingmayer/amazonreviews")
+print("Path to dataset files:", path)
+
+with bz2.open(path + "/test.ft.txt.bz2", "rt", encoding="utf-8") as f:
+    lines = [line.strip() for line in f]
+
+# --- Prepare DataFrame ---
+df = pd.DataFrame(lines, columns=["raw"])
+df["__label__"] = df["raw"].str.extract(r"(__label__\d)")
+df["review_text"] = df["raw"].str.replace(r"__label__\d\s", "", regex=True)
+df["sentiment"] = df["__label__"].map({"__label__1": "Negative", "__label__2": "Positive"})
+df["review_length"] = df["review_text"].apply(lambda x: len(re.findall(r"\b\w+\b", x)))
+
+# -----------------------------------------------------------
+# 1. Histogram – Distribution of Review Lengths
+# -----------------------------------------------------------
+plt.figure()
+plt.hist(df["review_length"], bins=40, color="steelblue", edgecolor="black")
+plt.title("Histogram – Review Lengths")
+plt.xlabel("Number of Words")
+plt.ylabel("Frequency")
+plt.grid(True)
+plt.savefig("eda_review_length_hist.png", bbox_inches="tight")
+
+# -----------------------------------------------------------
+# 2. Boxplot – Review Lengths (Overall)
+# -----------------------------------------------------------
+plt.figure()
+plt.boxplot(df["review_length"], vert=True)
+plt.title("Boxplot – Review Lengths")
+plt.ylabel("Number of Words")
+plt.grid(True)
+plt.savefig("eda_review_length_boxplot.png", bbox_inches="tight")
+
+# -----------------------------------------------------------
+# 3. QQ Plot – Normality Check for Review Length
+# -----------------------------------------------------------
+plt.figure()
+stats.probplot(df["review_length"], dist="norm", plot=plt)
+plt.title("QQ Plot – Review Lengths")
+plt.grid(True)
+plt.savefig("eda_review_length_qq.png", bbox_inches="tight")
+
+# -----------------------------------------------------------
+# 4. Boxplot – Review Length by Sentiment
+# -----------------------------------------------------------
+plt.figure(figsize=(7,4))
+sns.boxplot(x='sentiment', y='review_length', data=df, palette='Set2')
+plt.title('Review Length by Sentiment')
+plt.ylabel('Word Count')
+plt.tight_layout()
+plt.savefig('length_by_sentiment.png', dpi=200)
+plt.show()
