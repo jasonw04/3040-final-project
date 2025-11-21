@@ -39,7 +39,6 @@ from sklearn.metrics import (
 # (3) DATA PREPROCESSING
 # ============================================================
 
-print("Downloading dataset from KaggleHub...")
 path = kagglehub.dataset_download("bittlingmayer/amazonreviews")
 print("Path to dataset files:", path)
 
