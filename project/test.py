@@ -1,12 +1,4 @@
-"""
-ITEC 3040 Final Project — Sections 3, 4, 5, 6
-Using a 200,000-row random sample for modeling to keep runtime feasible.
-Models: Decision Tree, Naive Bayes, Logistic Regression.
-"""
 
-# ============================
-# Imports
-# ============================
 import kagglehub
 import bz2
 import re
@@ -34,10 +26,7 @@ from sklearn.metrics import (
     classification_report
 )
 
-# ============================================================
-# (3) DATA PREPROCESSING
-# ============================================================
-
+#3 data processing 
 
 path = kagglehub.dataset_download("bittlingmayer/amazonreviews")
 
@@ -96,9 +85,7 @@ print("\nTrain/Test sizes (after sampling):")
 print("  X_train:", X_train.shape)
 print("  X_test :", X_test.shape)
 
-# ============================================================
-# (4) CLASSIFICATION PROBLEM — TF-IDF + BASELINE
-# ============================================================
+#4 classification problem - tf-idf + baseline
 
 vectorizer = TfidfVectorizer(
     stop_words="english",
@@ -134,9 +121,8 @@ print("\n=== Baseline (Most Frequent Class) ===")
 print(f"Train accuracy = {baseline.score(X_train_tfidf, y_train):.4f}")
 print(f"Test accuracy  = {baseline.score(X_test_tfidf, y_test):.4f}")
 
-# ============================================================
-# (5 & 6) METHODS + RESULTS — Decision Tree, NB, LogReg
-# ============================================================
+#5 methods + results - decision tree, nb, logreg
+
 
 def evaluate_model(name, model, X_test, y_test, save_confusion=True):
     y_pred = model.predict(X_test)
@@ -170,16 +156,14 @@ def evaluate_model(name, model, X_test, y_test, save_confusion=True):
         fname = f"cm_{name.replace(' ', '_').lower()}.png"
         plt.savefig(fname, bbox_inches="tight")
         plt.close()
-        print(f"Saved confusion matrix as {fname}")
+
 
     return acc, prec, rec, f1, auc
 
 
 results = {}
 
-# -------------------------
-# Decision Tree (Lecture 4)
-# -------------------------
+# decision tree
 print("\nTraining Decision Tree on sampled data...")
 tree = DecisionTreeClassifier(
     random_state=42,
@@ -189,17 +173,14 @@ tree = DecisionTreeClassifier(
 tree.fit(X_train_tfidf, y_train)
 results["Decision Tree"] = evaluate_model("Decision Tree", tree, X_test_tfidf, y_test)
 
-# -------------------------
-# Naive Bayes (Lecture 4)
-# -------------------------
+# naive bayes
 print("\nTraining Naive Bayes...")
 nb = MultinomialNB()
 nb.fit(X_train_tfidf, y_train)
 results["Naive Bayes"] = evaluate_model("Naive Bayes", nb, X_test_tfidf, y_test)
 
-# -------------------------
-# Logistic Regression (Required)
-# -------------------------
+
+# logistic regression
 print("\nTraining Logistic Regression...")
 logreg = LogisticRegression(
     max_iter=2000,
@@ -209,9 +190,7 @@ logreg = LogisticRegression(
 logreg.fit(X_train_tfidf, y_train)
 results["Logistic Regression"] = evaluate_model("Logistic Regression", logreg, X_test_tfidf, y_test)
 
-# -------------------------
-# Summary table
-# -------------------------
+# summary
 rows = []
 for model_name, (acc, prec, rec, f1, auc) in results.items():
     rows.append({

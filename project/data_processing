@@ -1,11 +1,4 @@
-"""
-ITEC 3040 Final Project — Sections 3, 4, 5, 6
 
-"""
-
-# ============================
-# Imports
-# ============================
 import kagglehub
 import bz2
 import re
@@ -35,10 +28,7 @@ from sklearn.metrics import (
 
 
 
-# ============================================================
-# (3) DATA PREPROCESSING
-# ============================================================
-
+#3 data processing
 path = kagglehub.dataset_download("bittlingmayer/amazonreviews")
 print("Path to dataset files:", path)
 
@@ -94,9 +84,7 @@ print("  X_test :", X_test.shape)
 
 
 
-# ============================================================
-# (4) CLASSIFICATION PROBLEM — TF-IDF + BASELINE
-# ============================================================
+#4 classification problem - tf-idf + baseline
 
 vectorizer = TfidfVectorizer(
     stop_words="english",
@@ -134,9 +122,7 @@ print(f"Test accuracy  = {baseline.score(X_test_tfidf, y_test):.4f}")
 
 
 
-# ============================================================
-# (5 & 6) METHODS + RESULTS — WITHOUT KNN
-# ============================================================
+#5 methods + results 
 
 def evaluate_model(name, model, X_test, y_test, save_confusion=True):
     y_pred = model.predict(X_test)
@@ -172,32 +158,25 @@ def evaluate_model(name, model, X_test, y_test, save_confusion=True):
         fname = f"cm_{name.replace(' ', '_').lower()}.png"
         plt.savefig(fname, bbox_inches="tight")
         plt.close()
-        print(f"Saved confusion matrix as {fname}")
 
     return acc, prec, rec, f1, auc
 
 
 results = {}
 
-# -------------------------
-# Decision Tree (Lecture 4)
-# -------------------------
+
 print("\nTraining Decision Tree...")
 tree = DecisionTreeClassifier(random_state=42, max_depth=40)
 tree.fit(X_train_tfidf, y_train)
 results["Decision Tree"] = evaluate_model("Decision Tree", tree, X_test_tfidf, y_test)
 
-# -------------------------
-# Naive Bayes (Lecture 4)
-# -------------------------
+
 print("\nTraining Naive Bayes...")
 nb = MultinomialNB()
 nb.fit(X_train_tfidf, y_train)
 results["Naive Bayes"] = evaluate_model("Naive Bayes", nb, X_test_tfidf, y_test)
 
-# -------------------------
-# Logistic Regression (Required)
-# -------------------------
+
 print("\nTraining Logistic Regression...")
 logreg = LogisticRegression(
     max_iter=2000,
@@ -207,9 +186,7 @@ logreg = LogisticRegression(
 logreg.fit(X_train_tfidf, y_train)
 results["Logistic Regression"] = evaluate_model("Logistic Regression", logreg, X_test_tfidf, y_test)
 
-# -------------------------
-# Summary table
-# -------------------------
+
 rows = []
 for model_name, (acc, prec, rec, f1, auc) in results.items():
     rows.append({
@@ -227,4 +204,3 @@ print("\n\n=== SUMMARY OF ALL MODEL RESULTS ===")
 print(results_df)
 
 results_df.to_csv("model_results_summary.csv", index=False)
-print("\nSaved model_results_summary.csv")
