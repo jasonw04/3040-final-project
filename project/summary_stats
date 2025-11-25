@@ -9,7 +9,6 @@ import scipy.stats as stats
 
 # --- Download dataset ---
 path = kagglehub.dataset_download("bittlingmayer/amazonreviews")
-print("Path to dataset files:", path)
 
 # --- Load the full dataset ---
 with bz2.open(path + "/test.ft.txt.bz2", "rt", encoding="utf-8") as f:
