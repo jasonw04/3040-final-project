@@ -14,6 +14,7 @@ from sklearn.dummy import DummyClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
 
 from sklearn.metrics import (
     accuracy_score,
@@ -163,6 +164,24 @@ def evaluate_model(name, model, X_test, y_test, save_confusion=True):
 
 results = {}
 
+print("\nTraining KNN on sampled data...")
+
+knn_sample_size = 20_000
+
+train_size = min(knn_sample_size, X_train_tfidf.shape[0])
+
+X_train_knn, _, y_train_knn, _ = train_test_split(
+    X_train_tfidf,
+    y_train,
+    train_size=train_size,
+    random_state=42,
+    stratify=y_train
+)
+
+knn = KNeighborsClassifier(n_neighbors=5, n_jobs=-1)
+knn.fit(X_train_knn, y_train_knn)
+results["KNN"] = evaluate_model("KNN", knn, X_test_tfidf, y_test)
+
 # decision tree
 print("\nTraining Decision Tree on sampled data...")
 tree = DecisionTreeClassifier(
@@ -189,6 +208,7 @@ logreg = LogisticRegression(
 )
 logreg.fit(X_train_tfidf, y_train)
 results["Logistic Regression"] = evaluate_model("Logistic Regression", logreg, X_test_tfidf, y_test)
+
 
 # summary
 rows = []
