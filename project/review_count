@@ -1,0 +1,25 @@
+import kagglehub
+import bz2
+import pandas as pd
+import re
+
+# --- Download dataset ---
+path = kagglehub.dataset_download("bittlingmayer/amazonreviews")
+file_path = path + "/train.ft.txt.bz2"
+
+# --- Read all lines from the compressed file ---
+positive_count = 0
+negative_count = 0
+
+with bz2.open(file_path, "rt", encoding="utf-8") as f:
+    for line in f:
+        if line.startswith("__label__1"):
+            negative_count += 1
+        elif line.startswith("__label__2"):
+            positive_count += 1
+
+# --- Print results ---
+print("\n=== Sentiment Distribution in Full Dataset ===")
+print(f"Negative Reviews (label 1): {negative_count:,}")
+print(f"Positive Reviews (label 2): {positive_count:,}")
+print(f"Total Reviews: {positive_count + negative_count:,}")
