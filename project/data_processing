@@ -1,28 +1,20 @@
-"""
-ITEC 3040 Final Project — Sections 3, 4, 5, 6
-Using a 200,000-row random sample for modeling to keep runtime feasible.
-Models: Decision Tree, Naive Bayes, Logistic Regression, KNN (on smaller subset).
-"""
 
-# ============================
-# Imports
-# ============================
 import kagglehub
 import bz2
 import re
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
+from scipy.sparse import hstack, csr_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.dummy import DummyClassifier
-
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
+
 
 from sklearn.metrics import (
     accuracy_score,
@@ -35,7 +27,8 @@ from sklearn.metrics import (
     classification_report
 )
 
-#3 data preprocessing 
+ 
+# (3) DATA PREPROCESSING
 
 path = kagglehub.dataset_download("bittlingmayer/amazonreviews")
 
@@ -44,6 +37,7 @@ print("Loading file:", file_path)
 
 with bz2.open(file_path, "rt", encoding="utf-8") as f:
     lines = [line.strip() for line in f]
+
 
 df = pd.DataFrame(lines, columns=["raw"])
 
@@ -61,7 +55,7 @@ df["label_num"] = df["__label__"].map({"__label__1": 0, "__label__2": 1})
 df = df[["review_text", "label_num"]].dropna()
 print("\nAfter selecting columns & dropna, shape:", df.shape)
 
-# Sample a subset for modelling
+# 🔹 Sample a subset for modelling
 sample_size = 200_000
 df = df.sample(sample_size, random_state=42)
 print(f"\nAfter sampling for modelling (n={sample_size}), shape:", df.shape)
@@ -75,15 +69,23 @@ def clean_text(text: str) -> str:
 
 df["clean_text"] = df["review_text"].apply(clean_text)
 
-print("\nSample cleaned text:")
-print(df["clean_text"].head())
+# Review length (in words) — our extra feature
+df["review_length"] = df["clean_text"].str.split().str.len()
 
-# Train-test split
-X = df["clean_text"]
+print("\nSample cleaned text with length:")
+print(df[["clean_text", "review_length"]].head())
+
+ 
+# Train-test split (text + length + labels together)
+ 
+
+X_text = df["clean_text"]
+X_len = df["review_length"]
 y = df["label_num"]
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
+X_train_text, X_test_text, X_train_len, X_test_len, y_train, y_test = train_test_split(
+    X_text,
+    X_len,
     y,
     test_size=0.2,
     random_state=42,
@@ -91,10 +93,13 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 print("\nTrain/Test sizes (after sampling):")
-print("  X_train:", X_train.shape)
-print("  X_test :", X_test.shape)
+print("  X_train_text:", X_train_text.shape)
+print("  X_test_text :", X_test_text.shape)
 
-#4 classification problem - tf-idf + baseline
+ 
+# (4) CLASSIFICATION PROBLEM — TF-IDF + review_length + BASELINE
+ 
+
 vectorizer = TfidfVectorizer(
     stop_words="english",
     max_df=0.95,
@@ -103,12 +108,28 @@ vectorizer = TfidfVectorizer(
     max_features=20_000
 )
 
-X_train_tfidf = vectorizer.fit_transform(X_train)
-X_test_tfidf = vectorizer.transform(X_test)
+# TF–IDF from cleaned text
+X_train_tfidf = vectorizer.fit_transform(X_train_text)
+X_test_tfidf = vectorizer.transform(X_test_text)
 
 print("\nTF–IDF shapes:")
 print("  X_train_tfidf:", X_train_tfidf.shape)
 print("  X_test_tfidf :", X_test_tfidf.shape)
+
+# Convert review_length to a sparse column and append to TF–IDF
+X_train_len_arr = X_train_len.to_numpy().reshape(-1, 1)
+X_test_len_arr = X_test_len.to_numpy().reshape(-1, 1)
+
+X_train_len_sparse = csr_matrix(X_train_len_arr)
+X_test_len_sparse = csr_matrix(X_test_len_arr)
+
+# Final feature matrices: [TF–IDF | review_length]
+X_train_final = hstack([X_train_tfidf, X_train_len_sparse])
+X_test_final = hstack([X_test_tfidf, X_test_len_sparse])
+
+print("\nFinal feature shapes (TF–IDF + review_length):")
+print("  X_train_final:", X_train_final.shape)
+print("  X_test_final :", X_test_final.shape)
 
 # Class weights
 classes = np.unique(y_train)
@@ -121,14 +142,17 @@ class_weight_dict = dict(zip(classes, class_weights))
 print("\nClass weights:")
 print(class_weight_dict)
 
-# Baseline classifier
+# Baseline classifier (ignores features, uses label distribution)
 baseline = DummyClassifier(strategy="most_frequent")
-baseline.fit(X_train_tfidf, y_train)
+baseline.fit(X_train_final, y_train)
 
 print("\n=== Baseline (Most Frequent Class) ===")
-print(f"Train accuracy = {baseline.score(X_train_tfidf, y_train):.4f}")
-print(f"Test accuracy  = {baseline.score(X_test_tfidf, y_test):.4f}")
-#5 and 6 - methods + results
+print(f"Train accuracy = {baseline.score(X_train_final, y_train):.4f}")
+print(f"Test accuracy  = {baseline.score(X_test_final, y_test):.4f}")
+
+ 
+# (5 & 6) METHODS + RESULTS — KNN, DT, NB, LogReg
+ 
 
 def evaluate_model(name, model, X_test, y_test, save_confusion=True):
     y_pred = model.predict(X_test)
@@ -162,6 +186,7 @@ def evaluate_model(name, model, X_test, y_test, save_confusion=True):
         fname = f"cm_{name.replace(' ', '_').lower()}.png"
         plt.savefig(fname, bbox_inches="tight")
         plt.close()
+        print(f"Saved confusion matrix as {fname}")
 
     return acc, prec, rec, f1, auc
 
@@ -169,51 +194,90 @@ def evaluate_model(name, model, X_test, y_test, save_confusion=True):
 results = {}
 
 
+# KNN
+
 print("\nTraining KNN...")
 
-knn_sample_size = 20_000
-train_size = min(knn_sample_size, X_train_tfidf.shape[0])
-
-X_train_knn, _, y_train_knn, _ = train_test_split(
-    X_train_tfidf,
-    y_train,
-    train_size=train_size,
-    random_state=42,
-    stratify=y_train
-)
-
 knn = KNeighborsClassifier(n_neighbors=5, n_jobs=-1)
-knn.fit(X_train_knn, y_train_knn)
-results["KNN"] = evaluate_model("KNN", knn, X_test_tfidf, y_test)
+knn.fit(X_train_final, y_train)
 
+results["KNN"] = evaluate_model("KNN", knn, X_test_final, y_test)
+
+ 
+# Decision Tree
+ 
 print("\nTraining Decision Tree...")
 tree = DecisionTreeClassifier(
     random_state=42,
-    max_depth=25,  
-    min_samples_leaf=20 
+    max_depth=25,
+    min_samples_leaf=20
 )
-tree.fit(X_train_tfidf, y_train)
-results["Decision Tree"] = evaluate_model("Decision Tree", tree, X_test_tfidf, y_test)
+tree.fit(X_train_final, y_train)
+results["Decision Tree"] = evaluate_model("Decision Tree", tree, X_test_final, y_test)
 
+ 
+# Naive Bayes
+ 
 print("\nTraining Naive Bayes...")
 nb = MultinomialNB()
-nb.fit(X_train_tfidf, y_train)
-results["Naive Bayes"] = evaluate_model("Naive Bayes", nb, X_test_tfidf, y_test)
+nb.fit(X_train_final, y_train)
+results["Naive Bayes"] = evaluate_model("Naive Bayes", nb, X_test_final, y_test)
 
-
+ 
+# Logistic Regression
+ 
 print("\nTraining Logistic Regression...")
 logreg = LogisticRegression(
     max_iter=2000,
     class_weight="balanced",
     n_jobs=-1
 )
-logreg.fit(X_train_tfidf, y_train)
+logreg.fit(X_train_final, y_train)
 results["Logistic Regression"] = evaluate_model(
-    "Logistic Regression", logreg, X_test_tfidf, y_test
+    "Logistic Regression", logreg, X_test_final, y_test
 )
 
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-#summary
+# Convert sentiment labels for plotting
+df_plot = df.copy()
+df_plot["sentiment"] = df_plot["label_num"].map({0: "Negative", 1: "Positive"})
+
+plt.figure(figsize=(8, 5))
+sns.boxplot(data=df_plot, x="sentiment", y="review_length", palette="Set2")
+
+plt.title("Review Length by Sentiment")
+plt.xlabel("Sentiment")
+plt.ylabel("Review Length (Word Count)")
+plt.grid(axis="y", linestyle="--", alpha=0.6)
+
+plt.savefig("review_length_by_sentiment.png", dpi=200, bbox_inches="tight")
+plt.show()
+
+ 
+# TOP POSITIVE & NEGATIVE WORDS (from Logistic Regression)
+ 
+
+# The last feature is review_length; the first N are TF–IDF words.
+feature_names = np.array(vectorizer.get_feature_names_out())
+word_coefs = logreg.coef_[0][:len(feature_names)]  # ignore last coef (length)
+
+top_positive_indices = np.argsort(word_coefs)[-20:]
+top_negative_indices = np.argsort(word_coefs)[:20]
+
+print("\n=== TOP POSITIVE SENTIMENT WORDS (Logistic Regression) ===")
+for idx in reversed(top_positive_indices):
+    print(f"{feature_names[idx]:<20}  (weight: {word_coefs[idx]:.4f})")
+
+print("\n=== TOP NEGATIVE SENTIMENT WORDS (Logistic Regression) ===")
+for idx in top_negative_indices:
+    print(f"{feature_names[idx]:<20}  (weight: {word_coefs[idx]:.4f})")
+
+ 
+# SUMMARY TABLE
+ 
+
 rows = []
 for model_name, (acc, prec, rec, f1, auc) in results.items():
     rows.append({
@@ -227,6 +291,7 @@ for model_name, (acc, prec, rec, f1, auc) in results.items():
 
 results_df = pd.DataFrame(rows).sort_values(by="Accuracy", ascending=False)
 
-print("\n\n=== SUMMARY OF ALL MODEL RESULTS (sampled 200k ===")
+print("\n\n=== SUMMARY OF ALL MODEL RESULTS (sampled 200k, TF–IDF + length) ===")
 print(results_df)
-results_df.to_csv("model_results_summary_sample200k_with_knn.csv", index=False)
+
+results_df.to_csv("model_results_summary_sample200k_with_length_and_knn.csv", index=False)
