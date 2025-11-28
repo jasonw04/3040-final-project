@@ -10,6 +10,9 @@ import scipy.stats as stats
 sns.set_style("whitegrid")
 plt.rcParams['figure.figsize'] = (12, 6)
 
+# Color map: ensure Positive -> green, Negative -> red
+COLOR_MAP = {"Positive": "#51cf66", "Negative": "#ff6b6b"}
+
 print("=" * 80)
 print("EXPLORATORY DATA ANALYSIS - AMAZON REVIEWS DATASET")
 print("=" * 80)
@@ -57,9 +60,9 @@ print(sentiment_counts / len(df) * 100)
 
 # Pie chart
 fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-colors = ['#ff6b6b', '#51cf66']
+colors_for_pie = [COLOR_MAP.get(label, '#888888') for label in sentiment_counts.index]
 ax.pie(sentiment_counts, labels=sentiment_counts.index, autopct='%1.1f%%', 
-       colors=colors, startangle=90, textprops={'fontsize': 12})
+    colors=colors_for_pie, startangle=90, textprops={'fontsize': 12})
 ax.set_title('Sentiment Distribution in Amazon Reviews', fontsize=14, fontweight='bold')
 plt.tight_layout()
 plt.savefig('eda_01_sentiment_distribution.png', dpi=300, bbox_inches='tight')
@@ -109,7 +112,7 @@ print(df.groupby("sentiment")["word_count"].describe())
 
 # Boxplot by sentiment
 fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-sns.boxplot(x='sentiment', y='word_count', data=df, palette=['#ff6b6b', '#51cf66'], ax=ax)
+sns.boxplot(x='sentiment', y='word_count', data=df, palette=COLOR_MAP, ax=ax)
 ax.set_xlabel('Sentiment', fontsize=12)
 ax.set_ylabel('Word Count', fontsize=12)
 ax.set_title('Review Length Distribution by Sentiment', fontsize=14, fontweight='bold')
@@ -121,7 +124,7 @@ plt.close()
 
 # Violin plot (better for showing distribution shape)
 fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-sns.violinplot(x='sentiment', y='word_count', data=df, palette=['#ff6b6b', '#51cf66'], ax=ax)
+sns.violinplot(x='sentiment', y='word_count', data=df, palette=COLOR_MAP, ax=ax)
 ax.set_xlabel('Sentiment', fontsize=12)
 ax.set_ylabel('Word Count', fontsize=12)
 ax.set_title('Review Length Distribution by Sentiment (Violin Plot)', fontsize=14, fontweight='bold')
@@ -246,7 +249,7 @@ metrics = ["word_count", "char_count", "unique_words", "lexical_diversity"]
 titles = ["Word Count", "Character Count", "Unique Words", "Lexical Diversity"]
 
 for idx, (ax, metric, title) in enumerate(zip(axes.flat, metrics, titles)):
-    sns.boxplot(x='sentiment', y=metric, data=df, palette=['#ff6b6b', '#51cf66'], ax=ax)
+    sns.boxplot(x='sentiment', y=metric, data=df, palette=COLOR_MAP, ax=ax)
     ax.set_xlabel('Sentiment', fontsize=11)
     ax.set_ylabel(title, fontsize=11)
     ax.set_title(f'{title} by Sentiment', fontsize=12, fontweight='bold')
