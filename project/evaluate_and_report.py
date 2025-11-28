@@ -15,10 +15,12 @@ from sklearn.dummy import DummyClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     roc_auc_score, confusion_matrix, ConfusionMatrixDisplay, roc_curve, auc, classification_report
 )
+from scipy.sparse import hstack, csr_matrix
 
 sns.set_style('whitegrid')
 
@@ -88,16 +90,34 @@ def main(sample_size: int, quick: bool):
 
     # Clean
     df['clean_text'] = df['review_text'].apply(clean_text)
+    
+    # Compute review length (word count) as an additional feature
+    df['review_length'] = df['clean_text'].str.split().str.len()
 
     X = df['clean_text']
+    X_len = df['review_length']
     y = df['label_num']
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    X_train, X_test, X_train_len, X_test_len, y_train, y_test = train_test_split(
+        X, X_len, y, test_size=0.2, random_state=42, stratify=y
+    )
 
     # Vectorizer
     vectorizer = TfidfVectorizer(stop_words='english', max_df=0.95, min_df=5, ngram_range=(1, 2), max_features=20000)
     X_train_tfidf = vectorizer.fit_transform(X_train)
     X_test_tfidf = vectorizer.transform(X_test)
+    
+    # Convert review_length to sparse matrix and append to TF-IDF features
+    X_train_len_arr = X_train_len.to_numpy().reshape(-1, 1)
+    X_test_len_arr = X_test_len.to_numpy().reshape(-1, 1)
+    X_train_len_sparse = csr_matrix(X_train_len_arr)
+    X_test_len_sparse = csr_matrix(X_test_len_arr)
+    
+    # Combine TF-IDF and review_length
+    X_train_final = hstack([X_train_tfidf, X_train_len_sparse])
+    X_test_final = hstack([X_test_tfidf, X_test_len_sparse])
+    
+    print(f'Feature matrix shape (TF-IDF + review_length): {X_train_final.shape}')
 
     # Class weights (for info)
     classes = np.unique(y_train)
@@ -109,29 +129,37 @@ def main(sample_size: int, quick: bool):
 
     # Baseline
     baseline = DummyClassifier(strategy='most_frequent')
-    baseline.fit(X_train_tfidf, y_train)
-    results.append(evaluate_model('Baseline (Most Frequent)', baseline, X_test_tfidf, y_test))
+    baseline.fit(X_train_final, y_train)
+    results.append(evaluate_model('Baseline (Most Frequent)', baseline, X_test_final, y_test))
 
     # Decision Tree
     tree_max_depth = 25 if not quick else 10
     tree_min_samples_leaf = 20 if not quick else 50
     print('Training Decision Tree...')
     tree = DecisionTreeClassifier(random_state=42, max_depth=tree_max_depth, min_samples_leaf=tree_min_samples_leaf)
-    tree.fit(X_train_tfidf, y_train)
-    results.append(evaluate_model('Decision Tree', tree, X_test_tfidf, y_test))
+    tree.fit(X_train_final, y_train)
+    results.append(evaluate_model('Decision Tree', tree, X_test_final, y_test))
 
     # Naive Bayes
     print('Training Multinomial Naive Bayes...')
     nb = MultinomialNB()
-    nb.fit(X_train_tfidf, y_train)
-    results.append(evaluate_model('Naive Bayes', nb, X_test_tfidf, y_test))
+    nb.fit(X_train_final, y_train)
+    results.append(evaluate_model('Naive Bayes', nb, X_test_final, y_test))
 
     # Logistic Regression
     print('Training Logistic Regression...')
     logreg_max_iter = 2000 if not quick else 500
     logreg = LogisticRegression(max_iter=logreg_max_iter, class_weight='balanced', n_jobs=-1)
-    logreg.fit(X_train_tfidf, y_train)
-    results.append(evaluate_model('Logistic Regression', logreg, X_test_tfidf, y_test))
+    logreg.fit(X_train_final, y_train)
+    results.append(evaluate_model('Logistic Regression', logreg, X_test_final, y_test))
+
+    # K-Nearest Neighbors (convert sparse matrix to dense for KNN, as it doesn't support sparse input efficiently)
+    print('Training K-Nearest Neighbors (k=5)...')
+    X_train_dense = X_train_final.toarray()
+    X_test_dense = X_test_final.toarray()
+    knn = KNeighborsClassifier(n_neighbors=5, n_jobs=-1)
+    knn.fit(X_train_dense, y_train)
+    results.append(evaluate_model('KNN (k=5)', knn, X_test_dense, y_test))
 
     # Build results dataframe
     rows = []
