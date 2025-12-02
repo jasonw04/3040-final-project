@@ -7,6 +7,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.stats as stats
 
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+
+  
+# 1. Load dataset (test.ft.txt.bz2)
+  
+
 path = kagglehub.dataset_download("bittlingmayer/amazonreviews")
 
 
@@ -16,14 +23,18 @@ with bz2.open(path + "/test.ft.txt.bz2", "rt", encoding="utf-8") as f:
 df = pd.DataFrame(lines, columns=["raw"])
 df["__label__"] = df["raw"].str.extract(r"(__label__\d)")
 df["review_text"] = df["raw"].str.replace(r"__label__\d\s", "", regex=True)
-
-
+df["sentiment"] = df["__label__"].map({"__label__1": "Negative", "__label__2": "Positive"})
+df["label_num"] = df["__label__"].map({"__label__1": 0, "__label__2": 1})
 df["review_length"] = df["review_text"].apply(lambda x: len(re.findall(r"\b\w+\b", x)))
-s = df["review_length"]
 
 print(df.head())
-print(df.shape)
+print("Data shape:", df.shape)
 
+  
+# 2. Summary statistics – Review Length
+  
+
+s = df["review_length"]
 
 mean = s.mean()
 median = s.median()
@@ -46,57 +57,124 @@ print(f"  50th Percentile = {q50:.4f}")
 print(f"  75th Percentile = {q75:.4f}")
 print(f"  Maximum = {_max:.4f}")
 
+  
+# 3. EDA Plots
+  
 
-path = kagglehub.dataset_download("bittlingmayer/amazonreviews")
-print("Path to dataset files:", path)
-
-with bz2.open(path + "/test.ft.txt.bz2", "rt", encoding="utf-8") as f:
-    lines = [line.strip() for line in f]
-
-
-df = pd.DataFrame(lines, columns=["raw"])
-df["__label__"] = df["raw"].str.extract(r"(__label__\d)")
-df["review_text"] = df["raw"].str.replace(r"__label__\d\s", "", regex=True)
-df["sentiment"] = df["__label__"].map({"__label__1": "Negative", "__label__2": "Positive"})
-df["review_length"] = df["review_text"].apply(lambda x: len(re.findall(r"\b\w+\b", x)))
-
- 
-# 1. Histogram – Distribution of Review Lengths
- 
+# 3.1 Histogram – Distribution of Review Lengths (overall)
 plt.figure()
 plt.hist(df["review_length"], bins=40, color="steelblue", edgecolor="black")
-plt.title("Histogram – Review Lengths")
+plt.title("Histogram – Review Lengths (All Reviews)")
 plt.xlabel("Number of Words")
 plt.ylabel("Frequency")
 plt.grid(True)
 plt.savefig("eda_review_length_hist.png", bbox_inches="tight")
+plt.close()
 
- 
-# 2. Boxplot – Review Lengths (Overall)
- 
+# 3.2 Boxplot – Review Lengths (overall)
 plt.figure()
 plt.boxplot(df["review_length"], vert=True)
-plt.title("Boxplot – Review Lengths")
+plt.title("Boxplot – Review Lengths (All Reviews)")
 plt.ylabel("Number of Words")
 plt.grid(True)
 plt.savefig("eda_review_length_boxplot.png", bbox_inches="tight")
+plt.close()
 
-
-# 3. QQ Plot – Normality Check for Review Length
-
+# 3.3 QQ Plot – Normality Check
 plt.figure()
 stats.probplot(df["review_length"], dist="norm", plot=plt)
 plt.title("QQ Plot – Review Lengths")
 plt.grid(True)
 plt.savefig("eda_review_length_qq.png", bbox_inches="tight")
+plt.close()
 
-
-# 4. Boxplot – Review Length by Sentiment
-
-plt.figure(figsize=(7,4))
-sns.boxplot(x='sentiment', y='review_length', data=df, palette='Set2')
-plt.title('Review Length by Sentiment')
-plt.ylabel('Word Count')
+# 3.4 Boxplot – Review Length by Sentiment
+plt.figure(figsize=(7, 4))
+sns.boxplot(x="sentiment", y="review_length", data=df, palette="Set2")
+plt.title("Review Length by Sentiment")
+plt.xlabel("Sentiment")
+plt.ylabel("Word Count")
 plt.tight_layout()
-plt.savefig('length_by_sentiment.png', dpi=200)
-plt.show()
+plt.savefig("eda_review_length_by_sentiment_boxplot.png", dpi=200, bbox_inches="tight")
+plt.close()
+
+# 3.5 Histogram – Review Length by Sentiment
+plt.figure(figsize=(8, 5))
+sns.histplot(
+    data=df,
+    x="review_length",
+    hue="sentiment",
+    bins=40,
+    element="step",
+    stat="density",
+    common_norm=False
+)
+plt.title("Review Length Distribution by Sentiment")
+plt.xlabel("Number of Words")
+plt.ylabel("Density")
+plt.tight_layout()
+plt.savefig("eda_review_length_by_sentiment_hist.png", dpi=200, bbox_inches="tight")
+plt.close()
+
+
+  
+# 4. Additional EDA – TF–IDF + Logistic Regression
+#    (Top positive/negative words)
+  
+
+# 4.1 Clean text for TF–IDF
+def clean_text(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"[^a-z\s]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+df["clean_text"] = df["review_text"].apply(clean_text)
+
+# Optional sampling for speed
+max_sample = 200_000
+df_sample = df.sample(max_sample, random_state=42) if len(df) > max_sample else df
+
+print("\nUsing sample size for TF–IDF/LogReg:", df_sample.shape[0])
+
+X_text = df_sample["clean_text"]
+y = df_sample["label_num"]
+
+# 4.2 TF–IDF vectorizer
+vectorizer = TfidfVectorizer(
+    stop_words="english",
+    max_df=0.95,
+    min_df=5,
+    ngram_range=(1, 2),
+    max_features=20_000
+)
+X_tfidf = vectorizer.fit_transform(X_text)
+
+# 4.3 Logistic Regression to get word importance
+logreg = LogisticRegression(max_iter=2000, n_jobs=-1)
+logreg.fit(X_tfidf, y)
+
+# 4.4 Top positive & negative words (bar charts)
+feature_names = np.array(vectorizer.get_feature_names_out())
+coefs = logreg.coef_[0]
+
+top_pos_idx = np.argsort(coefs)[-20:]
+top_neg_idx = np.argsort(coefs)[:20]
+
+# Positive
+plt.figure(figsize=(10, 5))
+plt.barh(feature_names[top_pos_idx], coefs[top_pos_idx])
+plt.xlabel("Coefficient Weight")
+plt.title("Top 20 Positive Sentiment Words (Logistic Regression)")
+plt.tight_layout()
+plt.savefig("eda_top20_positive_words.png", dpi=200, bbox_inches="tight")
+plt.close()
+
+# Negative
+plt.figure(figsize=(10, 5))
+plt.barh(feature_names[top_neg_idx], coefs[top_neg_idx])
+plt.xlabel("Coefficient Weight")
+plt.title("Top 20 Negative Sentiment Words (Logistic Regression)")
+plt.tight_layout()
+plt.savefig("eda_top20_negative_words.png", dpi=200, bbox_inches="tight")
+plt.close()
