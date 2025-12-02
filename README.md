@@ -4,3 +4,5 @@
 4. to run the app run the following in the terminal 
 python -m streamlit run app.py
 
+make sure that all of the pngs are outside of the project folder to run the steamlit app
+
