@@ -11,6 +11,6 @@ when running data_preprocessing let it give it around 5 minutes to train and tes
 4. to run the app run the following in the terminal 
 python -m streamlit run app.py
 
-make sure that all of the pngs are outside of the 3040 final project folder to run the steamlit app
+make sure that the only data_processing, eda.py, evaluate_and_report.py, review count, summary_stats and test.py are the only files inside of the folder called project and everything else is outside the 3040 final project
 
-<img width="296" height="834" alt="image" src="https://github.com/user-attachments/assets/f869dddd-a8fc-4793-b38d-3be070da0501" />
+<img width="300" height="577" alt="image" src="https://github.com/user-attachments/assets/8276646d-bba3-430c-9e21-822ec6a1e99c" />
