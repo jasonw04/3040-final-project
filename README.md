@@ -13,3 +13,4 @@ python -m streamlit run app.py
 
 make sure that all of the pngs are outside of the 3040 final project folder to run the steamlit app
 
+<img width="296" height="834" alt="image" src="https://github.com/user-attachments/assets/f869dddd-a8fc-4793-b38d-3be070da0501" />
