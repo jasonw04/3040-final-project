@@ -11,5 +11,5 @@ when running data_preprocessing let it give it around 5 minutes to train and tes
 4. to run the app run the following in the terminal 
 python -m streamlit run app.py
 
-make sure that all of the pngs are outside of the project folder to run the steamlit app
+make sure that all of the pngs are outside of the 3040 final project folder to run the steamlit app
 
